@@ -107,10 +107,10 @@ def Handler(queue):
 							# client wrote message, probably
 							pass
 					else:
-						logging.info(f"Removing socket {client.getpeername()} cause it's broken or exited client program.")
+						logging.info(f"Removing some socket cause it's broken or exited client program.")
 						SOCKETS.remove(client)
 				except ConnectionResetError:
-					logging.warning(f"Client {client.getpeername()} exited program.")
+					logging.warning(f"Some client exited program.")
 					SOCKETS.remove(client)
 				except Exception:
 					logging.exception("uh-oh?\n")
