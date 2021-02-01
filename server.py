@@ -9,14 +9,26 @@ import json
 from utilities.ClientOperation import ClientOperation
 from utilities.loggerHelper import SERVER_LOG_FILE
 
-logging.basicConfig(level = logging.DEBUG,
-	format = "[%(asctime)s] -> [%(threadName)s/%(levelname)s] in function %(funcName)s: %(message)s",
-	datefmt = "%d/%b/%y | %H:%M:%S",
-	handlers = [
-		logging.FileHandler(SERVER_LOG_FILE, encoding = "utf-8"),
-		logging.StreamHandler()
-	]
-)
+try:
+	logging.basicConfig(level = logging.DEBUG,
+		format = "[%(asctime)s] -> [%(threadName)s/%(levelname)s] in function %(funcName)s: %(message)s",
+		datefmt = "%d/%b/%y | %H:%M:%S",
+		handlers = [
+			logging.FileHandler(SERVER_LOG_FILE, encoding = "utf-8"),
+			logging.StreamHandler()
+		]
+	)
+except FileNotFoundError:
+	open("SERVER_LOG_FILE", "w", encoding = "utf-8").close()
+	logging.basicConfig(level = logging.DEBUG,
+		format = "[%(asctime)s] -> [%(threadName)s/%(levelname)s] in function %(funcName)s: %(message)s",
+		datefmt = "%d/%b/%y | %H:%M:%S",
+		handlers = [
+			logging.FileHandler(SERVER_LOG_FILE, encoding = "utf-8"),
+			logging.StreamHandler()
+		]
+	)
+
 event = threading.Event()
 channels = {}
 
