@@ -20,9 +20,12 @@ class ServerOperation:
 			self.content = kwargs["messageContent"]
 			self.author = kwargs["messageAuthor"]
 		
+		elif self.type == "usersList":
+			pass
+
 		elif self.type == "usernameGet":
 			# str, user name
 			self.username = kwargs["username"]
 
-		elif self.type == "startWordsGame":
-			self.soloMode = kwargs["soloMode"]
+		# elif self.type == "startWordsGame":
+		# 	self.soloMode = kwargs["soloMode"]

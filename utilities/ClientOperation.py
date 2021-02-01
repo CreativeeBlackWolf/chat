@@ -15,6 +15,9 @@ class ClientOperation:
 		elif self.type == "requireUsername":
 			pass
 
+		elif self.type == "usersList":
+			self.users = kwargs["users"]
+
 		elif self.type == "channelCreateInfo":
 			# str instance, answer of the server (can be anything)
 			self.answer = kwargs["answer"]

@@ -29,7 +29,7 @@ class ApplicationStates:
 		"join": "Join to an existing channel -> /join, /j (ChannelName)",
 		"quit": "Quit the channel/program -> /quit, /q [-f, --force]",
 		"list": "Show list of all active channels -> /list, /l",
-		"startwordsgame": "Start playing the words game (even w/ yourself!) (W I P, do not try!)-> /startwordsgame | /swg [Solo]"
+		# "startwordsgame": "Start playing the words game (even w/ yourself!) (W I P, do not try!)-> /startwordsgame | /swg [Solo]"
 	}
 
 	applicationStyle = {

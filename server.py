@@ -18,6 +18,7 @@ logging.basicConfig(level = logging.DEBUG,
 	]
 )
 event = threading.Event()
+channels = {}
 
 def Main():
 	q = queue.Queue() # creating queue for ports
@@ -28,13 +29,9 @@ def Main():
 	Handler(q)
 
 def Handler(queue):
-	"""
-		whole server handler
-	"""
 	PORT = 2727    # 27
 	BUFFER = 4096
 	SOCKETS = []
-	channels = {}
 
 	ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -46,7 +43,7 @@ def Handler(queue):
 	workingHandler = True
 	while workingHandler:
 		event.wait(0.01)
-		rtr, rtw, err = select.select(SOCKETS, [], [], 0)
+		rtr, _, _ = select.select(SOCKETS, [], [], 0)
 		for client in rtr:
 			if client == ssock:
 				sfd, address = ssock.accept()
@@ -72,7 +69,7 @@ def Handler(queue):
 								thread = threading.Thread(target = ChannelServer, 
 									args = (channelPort, queue, channels, message.channelName), daemon = True) 
 								if not queue.empty():
-									channels[message.channelName] = {"port": channelPort}
+									channels[message.channelName] = {"port": channelPort, "usersAmount": 0}
 									thread.start()
 									logging.info(
 										f"Started {thread} for channel {message.channelName} ({channelPort})"
@@ -98,7 +95,7 @@ def Handler(queue):
 									channelName = message.channelName)))
 							except KeyError:
 								client.send(pickle.dumps(ClientOperation("channelJoinInfo", port = "404")))
-							except Exception as e:
+							except Exception:
 								logging.exception("OOPSIE! Some troubles with joining channel:\n")
 								client.send(pickle.dumps(ClientOperation("channelJoinInfo", port = "500")))
 						
@@ -114,7 +111,7 @@ def Handler(queue):
 				except ConnectionResetError:
 					logging.warning(f"Client {client.getpeername()} exited program.")
 					SOCKETS.remove(client)
-				except Exception as e:
+				except Exception:
 					logging.exception("uh-oh?\n")
 					SOCKETS.remove(client)
 
@@ -125,13 +122,13 @@ def ChannelServer(PORT, portQueue, channels, name):
 	USERNAMES = {}
 
 	# --- words game vars ---
-	gameStatus = False
-	usedWords = []
-	solo = False
-	gameQuery = queue.Queue()
-	turn = ""
-	lastWord = ""
-	wordsCounter = 0
+	# gameStatus = False
+	# usedWords = []
+	# solo = False
+	# gameQuery = queue.Queue()
+	# turn = ""
+	# lastWord = ""
+	# wordsCounter = 0
 
 
 	ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -143,7 +140,8 @@ def ChannelServer(PORT, portQueue, channels, name):
 	working = True
 	while working:
 		event.wait(0.01)
-		rtr, rtw, err = select.select(SOCKETS, [], [], 0)
+		rtr, _, _ = select.select(SOCKETS, [], [], 0)
+		channels[name]["usersAmount"] = len(USERNAMES)
 		for client in rtr:
 			if client == ssock:
 				# accepting a new client
@@ -160,83 +158,17 @@ def ChannelServer(PORT, portQueue, channels, name):
 
 						# if client wrote something, broadcast it to others
 						if message.type == "messageSend":
+							# client command
+							if message.content.startswith("/"):
+								continue
+
 							Broadcast(SOCKETS, ssock, client, message.author, message.content)
 							
-							if gameStatus and not message.content.startswith("!"):
-								if not lastWord:
-									lastWord = message.content.split()[0]
-									continue
-
-								word = message.content.split()[0]
-
-								if message.author == turn:
-									if not GameUtils.CheckWords(usedWords, lastWord, word):
-										Broadcast(SOCKETS, ssock, ssock, "Server", f"{turn}'s out.")
-									else:
-										lastWord = word
-										usedWords.append(lastWord)
-										wordsCounter += 1
-										gameQuery.put(turn)
-
-								# checking first if queue is almost empty
-								# checking also for solo mode
-								if gameQuery.qsize() == 1 and not solo:
-									Broadcast(SOCKETS, ssock, ssock, "Server", f"{turn} won! Words counter: {wordsCounter}")
-									gameQuery.get() # making gameQuery empty
-									gameStatus = False
-									continue
-
-								while True:
-									event.wait(0.01)
-									try:
-										turn = gameQuery.get_nowait()
-										if turn in USERNAMES.values():
-											Broadcast(SOCKETS, ssock, ssock, "Server", f"{turn}'s turn.")
-											break
-									except queue.Empty:
-										client.send(pickle.dumps(ClientOperation("messageArrived",
-											messageContent = f"You lose with {wordsCounter} words on counter.",
-											messageAuthor = "Server"
-											)))
-										gameStatus = False
-										break
+						elif message.type == "usersList":
+							client.send(pickle.dumps(ClientOperation("usersList")))
 
 						elif message.type == "usernameGet":
 							USERNAMES[str(clientIP)] = str(message.username)
-
-						elif message.type == "startWordsGame":
-							# if client is the only person in the room
-							if len(SOCKETS) == 2 and not message.soloMode:
-								client.send(pickle.dumps(ClientOperation("messageArrived", 
-									messageContent = "Room is empty... Except for you, of course.",
-									messageAuthor = "Server")))
-								
-							elif gameStatus:
-								client.send(pickle.dumps(ClientOperation("messageArrived", 
-									messageContent = "Game is already going.",
-									messageAuthor = "Server")))
-							else:
-								solo = False
-								wordsCounter = 0
-								lastWord = ""
-								usedWords.clear()
-								if message.soloMode:
-									solo = True
-									client.send(pickle.dumps(ClientOperation("messageArrived",
-										messageContent = "Happy playing with yourself. Hope you'll find someone later.",
-										messageAuthor = "Server"
-										)))
-								gameStatus = True
-								for i in USERNAMES.values():	
-									gameQuery.put(i)
-								turn = gameQuery.get()
-								unames = "\n"
-								for number, user in enumerate(USERNAMES.values()):
-									unames += f"{number + 1} -- {user}"
-								Broadcast(SOCKETS, ssock, ssock, "Server", 
-									f"""Game started. Here's the turn order:{unames}
-
-If you want to write message and it\'s your turn, write "!" in the start of the message.""")
 
 						# if client decided to leave from channel, remove it from clients list 
 						elif message.type == "channelLeave":
@@ -256,7 +188,7 @@ If you want to write message and it\'s your turn, write "!" in the start of the 
 				except ConnectionResetError:
 					logging.warning("Probably broken socket. Removin' it")
 					SOCKETS.remove(client)
-				except Exception as e:
+				except Exception:
 					logging.exception("uh-oh?")
 					SOCKETS.remove(client)
 				finally:
@@ -282,7 +214,7 @@ def Broadcast(SOCKETS: list, serverSocket, authorSocket, author: str, data: str)
 				socket.send(pickle.dumps(ClientOperation("messageArrived", 
 					messageAuthor = author, messageContent = data))
 				)
-		except Exception as e:
+		except Exception:
 			logging.exception("uh-oh?")
 			socket.close()
 			if socket in SOCKETS:

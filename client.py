@@ -118,14 +118,20 @@ def InputHandler(buff):
 					else:
 						ThreadPoolExecutor().submit(PrintToChatWindow(ans, "Client"))
 
-			elif command.lower() in ["/startwordsgame", "/swg"]:
+			elif command in ["/users", "/u"]:
 				if not ApplicationStates.onlineStatus:
-					StatusBar.SetStatusBarMessage("[Client]: You're offline.")
-					return
-				soloMode = False
-				if len(c) == 2:
-					soloMode = c[1] in ["solo", "one"]
-				cs.send(pickle.dumps(ServerOperation("startWordsGame", soloMode = soloMode)))
+					StatusBar.SetStatusBarMessage("[Client]: You're offline")
+				else:
+					s.send(pickle.dumps(ServerOperation("usersList")))
+
+			# elif command.lower() in ["/startwordsgame", "/swg"]:
+			# 	if not ApplicationStates.onlineStatus:
+			# 		StatusBar.SetStatusBarMessage("[Client]: You're offline.")
+			# 		return
+			# 	soloMode = False
+			# 	if len(c) == 2:
+			# 		soloMode = c[1] in ["solo", "one"]
+			# 	cs.send(pickle.dumps(ServerOperation("startWordsGame", soloMode = soloMode)))
 
 			elif command.startswith(("/debug", "/d")):
 				if ApplicationStates.debugMode is True:
@@ -223,6 +229,9 @@ def ChannelHandler(channelSocket, channelName, port):
 				if message.type == "requestUsername":
 					channelSocket.send(pickle.dumps(ServerOperation("usernameGet", username = username)))
 				
+				elif message.type == "usersList":
+					cex.submit(PrintToChatWindow(message.users))
+
 				elif message.type == "messageArrived":
 					cex.submit(PrintToChatWindow(message.content, message.author))
 					chatLog.append(f"({utils.GetTime()}) [{message.author}] -> {message.content}")
@@ -257,7 +266,7 @@ def ServerHandler(serverSocket):
 					if channelsList:
 						t = "\n"
 						for k in channelsList.keys():
-							t += f"|{k} / Port: {channelsList[k]['port']}\n"
+							t += f"|{k} -- Port: {channelsList[k]['port']} -- Users in room: {channelsList[k]['usersAmount']}\n"
 						ex.submit(PrintToChatWindow(t, "Server"))
 					else:
 						ex.submit(PrintToChatWindow("There are no channels avavible.", "Server"))
@@ -286,7 +295,7 @@ def ServerHandler(serverSocket):
 						StatusBar.SetStatusBarMessage(
 							"[Server]: Successfully joined channel. Happy chatting!"
 						)
-					except Exception as e:
+					except Exception:
 						StatusBar.SetStatusBarMessage(
 							"[Client]: An error has occured while trying to connect to channel. It's logged, if what."
 						)
@@ -387,7 +396,7 @@ onlineStatusBar = FormattedTextControl(UpdateOnlineStatus,
 
 root = HSplit([
 	outputField,                                       # text area for messages
-	Window(height = 1, char = "-", style = "#37fc00"), # separator
+	Window(height = 1, char = "─", style = "#37fc00"), # separator
 	VSplit([                                           # input field
 		Window(inputFieldPrompt, width = len(inputPrompt[0][1]) + len(inputPrompt[1][1]) + 1),
 		inputField
